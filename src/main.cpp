@@ -1,86 +1,120 @@
 #include <TFT_eSPI.h>
+#include <math.h>
+
+#define BUTTON_PIN 5  // D2 = GPIO5
 
 TFT_eSPI tft = TFT_eSPI();
 
-void printChipInfo() {
-  Serial.println("\n=== Chip Info ===");
-  Serial.printf("  CPU freq:  %d MHz\n",  ESP.getCpuFreqMHz());
-  Serial.printf("  Free heap: %d bytes\n", ESP.getFreeHeap());
-  Serial.printf("  SDK:       %s\n",       ESP.getSdkVersion());
+bool debugMode = false;
+bool lastButtonState = HIGH;
+
+const int CX = 120;
+const int CY = 120;
+const int R  = 115;
+
+const float    SWEEP_STEP = 2.0f;
+const uint32_t FRAME_MS   = 20;
+const int      TRAIL_LEN  = 12;
+
+float    sweepAngle    = 0;
+uint32_t lastSweepTime = 0;
+
+const uint16_t TRAIL_COLORS[] = {
+  0x07E0, 0x0640, 0x04C0, 0x0380,
+  0x0280, 0x01C0, 0x0140, 0x00E0,
+  0x00A0, 0x0060, 0x0040, 0x0020,
+  0x0000
+};
+
+void sweepEnd(float deg, int &x2, int &y2) {
+  float rad = deg * M_PI / 180.0f;
+  x2 = CX + (int)(R * sinf(rad) + 0.5f);
+  y2 = CY - (int)(R * cosf(rad) + 0.5f);
 }
 
-void printPinConfig() {
-  Serial.println("=== TFT Pin Config (compiled) ===");
-  Serial.printf("  MOSI: %d\n",  TFT_MOSI);
-  Serial.printf("  SCLK: %d\n",  TFT_SCLK);
-  Serial.printf("  CS:   %d\n",  TFT_CS);
-  Serial.printf("  DC:   %d\n",  TFT_DC);
-  Serial.printf("  RST:  %d\n",  TFT_RST);
-  Serial.printf("  SPI:  %d MHz\n", SPI_FREQUENCY / 1000000);
-#ifdef USE_HSPI_PORT
-  Serial.println("  Bus:  HSPI");
-#else
-  Serial.println("  Bus:  VSPI/default");
-#endif
-}
-
-void colorTest() {
-  Serial.println("=== Color Test ===");
-  struct { uint16_t bg; uint16_t fg; const char* name; } tests[] = {
-    { TFT_RED,   TFT_WHITE, "RED"   },
-    { TFT_GREEN, TFT_BLACK, "GREEN" },
-    { TFT_BLUE,  TFT_WHITE, "BLUE"  },
-    { TFT_WHITE, TFT_BLACK, "WHITE" },
-  };
-  for (auto& t : tests) {
-    tft.fillScreen(t.bg);
-    tft.setTextColor(t.fg, t.bg);
-    tft.setTextSize(2);
-    tft.setCursor(80, 115);
-    tft.print(t.name);
-    Serial.printf("  %s\n", t.name);
-    delay(800);
+void drawRingsAndCrosshairs() {
+  for (int i = 1; i <= 4; i++) {
+    tft.drawCircle(CX, CY, R * i / 4, TFT_DARKGREEN);
   }
+  tft.drawLine(CX, CY - R, CX, CY + R, TFT_DARKGREEN);
+  tft.drawLine(CX - R, CY, CX + R, CY, TFT_DARKGREEN);
 }
 
-void drawTestPattern() {
-  Serial.println("=== Test Pattern ===");
+void drawLabels() {
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(117,   4); tft.print("N");
+  tft.setCursor(117, 228); tft.print("S");
+  tft.setCursor(228, 116); tft.print("E");
+  tft.setCursor(  4, 116); tft.print("W");
+  tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+  tft.setCursor(CX + R/4 + 2,   CY - 8); tft.print("25");
+  tft.setCursor(CX + R/2 + 2,   CY - 8); tft.print("50");
+  tft.setCursor(CX + 3*R/4 + 2, CY - 8); tft.print("75");
+}
+
+void drawRadarBackground() {
   tft.fillScreen(TFT_BLACK);
-  tft.drawLine(120, 0,   120, 240, TFT_DARKGREY);
-  tft.drawLine(0,   120, 240, 120, TFT_DARKGREY);
-  tft.drawCircle(120, 120, 119, TFT_WHITE);
-  tft.fillRect(0,   0,   8, 8, TFT_RED);
-  tft.fillRect(232, 0,   8, 8, TFT_GREEN);
-  tft.fillRect(232, 232, 8, 8, TFT_BLUE);
-  tft.fillRect(0,   232, 8, 8, TFT_YELLOW);
+  drawRingsAndCrosshairs();
+  drawLabels();
+}
+
+void updateSweep() {
+  uint32_t now = millis();
+  if (now - lastSweepTime < FRAME_MS) return;
+  lastSweepTime = now;
+
+  int x2, y2;
+
+  // Erase previous sweep position
+  sweepEnd(sweepAngle - SWEEP_STEP, x2, y2);
+  tft.drawLine(CX, CY, x2, y2, TFT_BLACK);
+
+  // Draw new sweep line
+  sweepEnd(sweepAngle, x2, y2);
+  tft.drawLine(CX, CY, x2, y2, TFT_GREEN);
+
+  // Labels first, then crosshairs on top — so text background can't erase them
+  drawLabels();
+  drawRingsAndCrosshairs();
+
+  sweepAngle = fmodf(sweepAngle + SWEEP_STEP, 360.0f);
+}
+
+void drawDebug() {
+  tft.fillScreen(TFT_NAVY);
+  tft.setTextColor(TFT_WHITE, TFT_NAVY);
+  tft.setTextSize(2);
+  tft.setCursor(65, 110);
+  tft.print("DEBUG");
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(500);
-  Serial.println("\n\n=== Boot ===");
-
-  printChipInfo();
-  printPinConfig();
-
-  Serial.print("Calling tft.init()... ");
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   tft.init();
   tft.setRotation(0);
-  Serial.println("done");
-  Serial.printf("  Display: %d x %d\n", tft.width(), tft.height());
-
-  colorTest();
-  drawTestPattern();
-  delay(1500);
-
-  tft.fillScreen(TFT_BLACK);
-  tft.fillCircle(120, 120, 100, TFT_BLUE);
-  tft.setTextColor(TFT_WHITE, TFT_BLUE);
-  tft.setTextSize(2);
-  tft.setCursor(55, 115);
-  tft.println("Hello World!");
-
-  Serial.println("Setup complete.");
+  drawRadarBackground();
+  Serial.println("Ready");
 }
 
-void loop() {}
+void loop() {
+  bool buttonState = digitalRead(BUTTON_PIN);
+  if (buttonState == LOW && lastButtonState == HIGH) {
+    debugMode = !debugMode;
+    if (debugMode) {
+      drawDebug();
+      Serial.println("Debug mode");
+    } else {
+      drawRadarBackground();
+      sweepAngle = 0;
+      Serial.println("Radar mode");
+    }
+    delay(50);
+  }
+  lastButtonState = buttonState;
+
+  if (!debugMode) updateSweep();
+
+  delay(1);
+}
