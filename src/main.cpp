@@ -37,6 +37,7 @@ static const char* resetReasonStr(esp_reset_reason_t r) {
 
 void setup() {
   Serial.begin(115200);
+  delay(3000);
   esp_reset_reason_t reason = esp_reset_reason();
   Serial.printf("[boot] reset reason: %s\n", resetReasonStr(reason));
 
