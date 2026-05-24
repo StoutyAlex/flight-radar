@@ -1,5 +1,6 @@
 #include "fetch_task.h"
 #include "opensky.h"
+#include "routes.h"
 #include "wifi_manager.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -12,6 +13,8 @@ static void fetchLoop(void*) {
     xSemaphoreTake(trigger, portMAX_DELAY);
     if (wifiConnected()) {
       fetchAircraft();
+      pruneRouteCache();
+      lookupPendingRoute();
     }
   }
 }

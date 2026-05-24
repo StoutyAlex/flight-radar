@@ -9,6 +9,7 @@ struct Aircraft {
   float lat;
   float lon;
   float altitude;      // feet
+  float heading;       // degrees from North, -1 if unavailable
   bool  valid;
 };
 

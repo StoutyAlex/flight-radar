@@ -97,6 +97,12 @@ void fetchAircraft() {
     t.lat      = lat.as<float>();
     t.lon      = lon.as<float>();
     t.altitude = alt;
+
+    // Heading: prefer true_heading, fall back to track over ground
+    JsonVariant hdg = a["true_heading"];
+    if (hdg.isNull()) hdg = a["track"];
+    t.heading = hdg.isNull() ? -1.0f : hdg.as<float>();
+
     t.valid    = true;
     count++;
   }
