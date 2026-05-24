@@ -1,3 +1,4 @@
 #pragma once
+#include <stdint.h>
 
-void drawDebug();
+void drawDebug(uint32_t lastFetchMs);
