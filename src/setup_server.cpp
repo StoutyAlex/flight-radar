@@ -6,7 +6,8 @@
 #include "config.h"
 #include "display.h"
 
-static WebServer server(80);
+static WebServer  server(80);
+static uint8_t    wizardPage = 0;
 
 static const char HTML_TMPL[] =
   "<!DOCTYPE html><html><head>"
@@ -73,22 +74,70 @@ static const char HTML_TMPL[] =
   ".catch(()=>s.textContent='Lookup failed');}"
   "</script></body></html>";
 
-static void drawSetupScreen() {
-  const char* url = "http://radar.local";
+// Page 0: Welcome
+static void drawPage0() {
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(MC_DATUM);
+  spr.drawCircle(120, 120, 118, TFT_DARKGREEN);
 
+  // Mini radar
+  for (int i = 1; i <= 3; i++)
+    spr.drawCircle(120, 82, 15 * i, TFT_DARKGREEN);
+  spr.drawLine(120, 82, 120, 37, TFT_GREEN);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.setTextSize(2);
+  spr.drawString("RADAR", 120, 142);
+  spr.setTextColor(TFT_CYAN, TFT_BLACK);
+  spr.setTextSize(1);
+  spr.drawString("Aircraft Tracker", 120, 162);
+
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString("[ press ] next >", 120, 198);
+
+  spr.pushSprite(0, 0);
+}
+
+// Page 1: What it does
+static void drawPage1() {
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(MC_DATUM);
+  spr.drawCircle(120, 120, 118, TFT_DARKGREEN);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.setTextSize(2);
+  spr.drawString("What it does", 120, 35);
+
+  spr.setTextSize(1);
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(TFT_GREEN, TFT_BLACK);
+  int x = 28, y = 72;
+  spr.drawString("+ Live aircraft positions", x, y); y += 18;
+  spr.drawString("+ Callsigns & type codes",  x, y); y += 18;
+  spr.drawString("+ Route origins shown",     x, y); y += 18;
+  spr.drawString("+ Updates every 20 sec",    x, y); y += 18;
+  spr.drawString("+ Configure via phone",     x, y);
+
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString("[ press ] scan QR code >", 120, 198);
+
+  spr.pushSprite(0, 0);
+}
+
+// Page 2: QR code — drawn directly to TFT (white background)
+static void drawPage2() {
+  const char* url = "http://radar.local";
   QRCode qrcode;
   uint8_t buf[qrcode_getBufferSize(3)];
   qrcode_initText(&qrcode, buf, 3, ECC_LOW, url);
 
-  // White background directly on TFT (no sprite — setup screen is static)
   tft.fillScreen(TFT_WHITE);
 
-  // QR code: version 3 = 29 modules, scale 5 → 145px, fully centred.
-  // Corner-to-centre distance ≈ 103px, safely inside the 120px circle radius.
   const int scale = 5;
   const int qsize = qrcode.size * scale;
   const int ox    = (240 - qsize) / 2;
-  const int oy    = (240 - qsize) / 2;
+  const int oy    = (240 - qsize) / 2 - 10;
 
   for (uint8_t y = 0; y < qrcode.size; y++) {
     for (uint8_t x = 0; x < qrcode.size; x++) {
@@ -96,6 +145,18 @@ static void drawSetupScreen() {
       tft.fillRect(ox + x * scale, oy + y * scale, scale, scale, col);
     }
   }
+
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.setTextSize(1);
+  tft.drawString("Scan to configure", 120, 22);
+  tft.drawString("http://radar.local", 120, 212);
+}
+
+static void drawWizardPage(uint8_t page) {
+  if (page == 0)      drawPage0();
+  else if (page == 1) drawPage1();
+  else                drawPage2();
 }
 
 static void handleRoot() {
@@ -126,11 +187,12 @@ static void handleSave() {
 }
 
 void setupServerBegin() {
+  wizardPage = 0;
   MDNS.begin("radar");
   server.on("/",     HTTP_GET,  handleRoot);
   server.on("/save", HTTP_POST, handleSave);
   server.begin();
-  drawSetupScreen();
+  drawWizardPage(0);
 }
 
 void setupServerStop() {
@@ -140,4 +202,11 @@ void setupServerStop() {
 
 void setupServerHandle() {
   server.handleClient();
+}
+
+void setupServerOnShortPress() {
+  if (wizardPage < 2) {
+    wizardPage++;
+    drawWizardPage(wizardPage);
+  }
 }

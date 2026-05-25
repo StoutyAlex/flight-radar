@@ -26,11 +26,44 @@ uint32_t lastDebugRefresh = 0;
 uint32_t buttonPressTime  = 0;
 bool     longPressArmed   = false;
 
+static void showBootScreen() {
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(MC_DATUM);
+  spr.drawCircle(120, 120, 118, TFT_DARKGREEN);
+  for (int i = 1; i <= 3; i++)
+    spr.drawCircle(120, 88, 15 * i, TFT_DARKGREEN);
+  spr.drawLine(120, 88, 120, 43, TFT_GREEN);
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.setTextSize(1);
+  spr.drawString("Loading", 120, 158);
+  spr.setTextColor(TFT_GREEN, TFT_BLACK);
+  spr.setTextSize(3);
+  spr.drawString("Radar", 120, 175);
+  spr.pushSprite(0, 0);
+}
+
+static void showEnteringSetup() {
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(MC_DATUM);
+  spr.drawCircle(120, 120, 118, TFT_DARKGREY);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.setTextSize(2);
+  spr.drawString("Entering", 120, 95);
+  spr.setTextColor(TFT_CYAN, TFT_BLACK);
+  spr.drawString("Setup Mode", 120, 120);
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.setTextSize(1);
+  spr.drawString("Hold button to exit", 120, 165);
+  spr.pushSprite(0, 0);
+}
+
 static void enterSetupMode() {
   setupMode = true;
   debugMode = false;
+  showEnteringSetup();
   wifiSleep();
   wifiBegin();
+  delay(600);
   setupServerBegin();
 }
 
@@ -58,7 +91,7 @@ void setup() {
   spr.setColorDepth(8);
   spr.createSprite(240, 240);
 
-  drawRadarBackground();
+  showBootScreen();
   wifiBegin();
   configTime(0, 0, "pool.ntp.org");
   setenv("TZ", "GMT0BST,M3.5.0/1,M10.5.0", 1);
@@ -78,7 +111,9 @@ void loop() {
   if (buttonState == HIGH && lastButtonState == LOW) {
     // Short press released
     if (longPressArmed) {
-      if (!setupMode) {
+      if (setupMode) {
+        setupServerOnShortPress();
+      } else {
         debugMode = !debugMode;
         if (debugMode) {
           drawDebug(lastFetchTime);

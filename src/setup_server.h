@@ -3,3 +3,4 @@
 void setupServerBegin();
 void setupServerStop();
 void setupServerHandle();
+void setupServerOnShortPress();
