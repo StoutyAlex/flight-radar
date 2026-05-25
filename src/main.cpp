@@ -5,9 +5,8 @@
 #include "opensky.h"
 #include "fetch_task.h"
 #include <time.h>
-#include <esp_system.h>
 
-#define BUTTON_PIN 5  // D2 = GPIO5
+#define BUTTON_PIN 5  // GPIO5
 
 static const uint32_t FETCH_INTERVAL_MS = 15000;
 static const uint32_t DEBUG_REFRESH_MS  = 1000;
@@ -20,34 +19,15 @@ bool     lastButtonState  = HIGH;
 uint32_t lastFetchTime    = 0;
 uint32_t lastDebugRefresh = 0;
 
-static const char* resetReasonStr(esp_reset_reason_t r) {
-  switch (r) {
-    case ESP_RST_POWERON:  return "power-on";
-    case ESP_RST_EXT:      return "external pin";
-    case ESP_RST_SW:       return "software";
-    case ESP_RST_PANIC:    return "PANIC/crash";
-    case ESP_RST_INT_WDT:  return "interrupt watchdog";
-    case ESP_RST_TASK_WDT: return "task watchdog";
-    case ESP_RST_WDT:      return "watchdog";
-    case ESP_RST_DEEPSLEEP:return "deep sleep wakeup";
-    case ESP_RST_BROWNOUT: return "BROWNOUT";
-    default:               return "unknown";
-  }
-}
-
 void setup() {
   Serial.begin(115200);
-  delay(3000);
-  esp_reset_reason_t reason = esp_reset_reason();
-  Serial.printf("[boot] reset reason: %s\n", resetReasonStr(reason));
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   tft.init();
   tft.setRotation(0);
 
   spr.setColorDepth(8);
-  bool sprOk = spr.createSprite(240, 240);
-  Serial.printf("[boot] sprite %s  heap=%u\n", sprOk ? "ok" : "FAILED", ESP.getFreeHeap());
+  spr.createSprite(240, 240);
 
   drawRadarBackground();
   wifiBegin();
@@ -55,7 +35,6 @@ void setup() {
   setenv("TZ", "GMT0BST,M3.5.0/1,M10.5.0", 1);
   tzset();
   initFetchTask();
-  Serial.println("[boot] ready");
 }
 
 void loop() {
@@ -65,11 +44,9 @@ void loop() {
     if (debugMode) {
       drawDebug(lastFetchTime);
       lastDebugRefresh = millis();
-      Serial.println("Debug mode");
     } else {
       drawRadarBackground();
       resetSweep();
-      Serial.println("Radar mode");
     }
     delay(200);
   }
@@ -95,7 +72,6 @@ void loop() {
     }
   }
 
-  // Fetch complete — aircraft data is updated; sweep picks it up automatically
   if (fetchComplete) {
     fetchComplete = false;
   }
