@@ -8,8 +8,9 @@
 
 #define BUTTON_PIN 5  // GPIO5
 
-static const uint32_t FETCH_INTERVAL_MS = 15000;
-static const uint32_t DEBUG_REFRESH_MS  = 1000;
+static const uint32_t FETCH_INTERVAL_MS  = 20000;
+static const uint32_t WIFI_WAKE_AHEAD_MS = 5000;
+static const uint32_t DEBUG_REFRESH_MS   = 1000;
 
 TFT_eSPI    tft = TFT_eSPI();
 TFT_eSprite spr = TFT_eSprite(&tft);
@@ -64,8 +65,16 @@ void loop() {
 
   wifiMaintain();
 
+  uint32_t now = millis();
+
+  // Wake WiFi ahead of the next scheduled fetch
+  if (wifiAsleep() && lastFetchTime > 0) {
+    if (now - lastFetchTime >= FETCH_INTERVAL_MS - WIFI_WAKE_AHEAD_MS) {
+      wifiWake();
+    }
+  }
+
   if (wifiConnected()) {
-    uint32_t now = millis();
     if (lastFetchTime == 0 || now - lastFetchTime >= FETCH_INTERVAL_MS) {
       lastFetchTime = now;
       requestFetch();
@@ -74,6 +83,7 @@ void loop() {
 
   if (fetchComplete) {
     fetchComplete = false;
+    wifiSleep();
   }
 
   delay(1);

@@ -4,6 +4,8 @@
 static const char* SSID     = "Apollo House";
 static const char* PASSWORD = "aabbcc1122";
 
+static bool _asleep = false;
+
 void wifiBegin() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
@@ -27,7 +29,26 @@ bool wifiConnected() {
   return WiFi.status() == WL_CONNECTED;
 }
 
+void wifiSleep() {
+  _asleep = true;
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+}
+
+void wifiWake() {
+  _asleep = false;
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(SSID, PASSWORD);
+}
+
+bool wifiAsleep() {
+  return _asleep;
+}
+
 void wifiMaintain() {
+  if (_asleep) return;
   wl_status_t status = (wl_status_t)WiFi.status();
 
   // Log status every 5s while not connected
