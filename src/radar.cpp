@@ -2,6 +2,7 @@
 #include "radar.h"
 #include "opensky.h"
 #include "routes.h"
+#include "config.h"
 #include <math.h>
 
 static const int CX = 120;
@@ -10,12 +11,6 @@ static const int R  = 115;
 
 static const float    SWEEP_STEP = 2.0f;
 static const uint32_t FRAME_MS   = 20;
-
-static const float CENTER_LAT     = 53.39f;
-static const float CENTER_LON     = -2.64f;
-static const float KM_PER_DEG_LAT = 111.0f;
-static const float KM_PER_DEG_LON = 66.02f;
-static const float RANGE_KM       = 20.0f;
 
 static float    sweepAngle    = 0;
 static uint32_t lastSweepTime = 0;
@@ -28,6 +23,7 @@ static void drawRingsAndCrosshairs() {
 }
 
 static void drawLabels() {
+    float range = configGet().range_km;
     spr.setTextSize(1);
     spr.setTextColor(TFT_GREEN, TFT_BLACK);
     spr.setCursor(117,   4); spr.print("N");
@@ -35,9 +31,9 @@ static void drawLabels() {
     spr.setCursor(228, 116); spr.print("E");
     spr.setCursor(  4, 116); spr.print("W");
     spr.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    spr.setCursor(CX + R/4 + 2,   CY - 8); spr.print("5");
-    spr.setCursor(CX + R/2 + 2,   CY - 8); spr.print("10");
-    spr.setCursor(CX + 3*R/4 + 2, CY - 8); spr.print("15");
+    spr.setCursor(CX + R/4 + 2,   CY - 8); spr.print((int)(range * 0.25f + 0.5f));
+    spr.setCursor(CX + R/2 + 2,   CY - 8); spr.print((int)(range * 0.50f + 0.5f));
+    spr.setCursor(CX + 3*R/4 + 2, CY - 8); spr.print((int)(range * 0.75f + 0.5f));
 }
 
 // Filled triangle pointing in heading direction (0=North, clockwise)
@@ -61,6 +57,13 @@ static void drawPlaneIcon(int px, int py, float heading, uint16_t color) {
 
 static void plotAircraft() {
     if (fetchInProgress) return;
+
+    const Config& cfg        = configGet();
+    const float   RANGE_KM   = cfg.range_km;
+    const float   CENTER_LAT = cfg.lat;
+    const float   CENTER_LON = cfg.lon;
+    const float   KM_PER_DEG_LAT = 111.0f;
+    const float   KM_PER_DEG_LON = cosf(cfg.lat * (float)M_PI / 180.0f) * 111.0f;
 
     int count = aircraftCount;
     for (int i = 0; i < count; i++) {

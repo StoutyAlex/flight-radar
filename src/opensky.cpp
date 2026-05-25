@@ -1,14 +1,22 @@
 
 #include "opensky.h"
+#include "config.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <math.h>
 #include <string.h>
 
-// 20km ≈ 10.8nm, round to 11nm for the airplanes.live radius parameter
-static const char* URL =
-  "https://api.airplanes.live/v2/point/53.39/-2.64/11";
+static char URL[80];
+
+static void buildUrl() {
+  const Config& c = configGet();
+  int radius_nm = max(1, (int)(c.range_km * 0.539957f + 0.5f));
+  snprintf(URL, sizeof(URL),
+           "https://api.airplanes.live/v2/point/%.4f/%.4f/%d",
+           c.lat, c.lon, radius_nm);
+}
 
 Aircraft         aircraft[MAX_AIRCRAFT];
 int              aircraftCount   = 0;
@@ -24,6 +32,7 @@ static void trimSpaces(char* s) {
 }
 
 void fetchAircraft() {
+  buildUrl();
   Serial.printf("[fetch] starting (WiFi: %s)\n",
                 WiFi.status() == WL_CONNECTED ? "up" : "down");
 
