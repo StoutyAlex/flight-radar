@@ -49,11 +49,15 @@ void wifiMaintain() {
 
   // Safety net: if the driver's auto-reconnect has stalled, force a fresh attempt
   static uint32_t lastAttempt = 0;
-  if (now - lastAttempt < 60000) return;
+  if (now - lastAttempt < 30000) return;
   lastAttempt = now;
 
   Serial.println("[wifi] forcing reconnect");
-  WiFi.disconnect(false);
-  delay(500);
+  WiFi.mode(WIFI_OFF);
+  delay(1000);
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
+  WiFi.scanNetworks();  // warm up radio before connect
   WiFi.begin(SSID, PASSWORD);
 }
